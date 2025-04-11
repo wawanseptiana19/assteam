@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pembaca Kode QR dengan Harga Motor</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            box-sizing: border-box;
+            padding-top: 50px;
+            position: relative;
+        }
+        #header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            width: 100%;
+            box-sizing: border-box;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #header h1 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+        #content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 70px;
+            width: 90%;
+            max-width: 800px;
+            box-sizing: border-box;
+        }
+        #pindai-qr-button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        #video-container {
+            display: none;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            width: 100%;
+            position: relative;
+        }
+        #qr-video {
+            width: 100%;
+            height: auto;
+            max-height: 480px;
+            display: block;
+        }
+        #hasil-scan {
+            font-size: 16px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 20px;
+            word-wrap: break-word;
+            width: 100%;
+            text-align: center;
+        }
+        #hasil-scan.error {
+            color: red;
+        }
+        #error-message {
+            color: red;
+            margin-bottom: 20px;
+            display: none;
+            width: 100%;
+            text-align: center;
+        }
+        #stop-scan-button {
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        /* Styling untuk tabel data */
+        #data-hari-ini {
+            margin-top: 20px;
+            width: 100%;
+            overflow-x: auto;
+        }
+        #data-hari-ini h2 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 15px;
+        }
+        table th,
+        table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        table th {
+            background-color: #007bff;
+            color: #fff;
+        }
+        table tr:hover {
+            background-color: #e0f7fa;
+        }
+        /* Styling untuk summary */
+        #summary {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .delete-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Pemindai QR Code</h1>
+        <button id="pindai-qr-button">Mulai Pindai QR</button>
+    </div>
+    <div id="content">
+        <div id="video-container">
+            <video id="qr-video" autoplay></video>
+        </div>
+        <div id="hasil-scan">Hasil Scan: </div>
+        <div id="error-message"></div>
+        <button id="stop-scan-button">Stop Pemindaian</button>
+        
+        <div id="data-hari-ini">
+            <h2>Data Motor Hari Ini</h2>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Nama</th>
+                        <th>Jenis Motor</th>
+                        <th>Harga</th>
+                        <th>Tanggal</th>
+                        <th>Aksi</th> </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+            
+            <div id="summary">
+                Total Pemasukan: Rp 0 <br>
+                Motor Kecil: 0, Motor Besar: 0 <br>
+                Komisi Total: Rp 0 <br>
+                Pemasukan Hari Ini: Rp 0
+            </div>
+            
+            <h2>Rekap Komisi Per Nama</h2>
+            <table id="commission-table">
+                <thead>
+                    <tr>
+                        <th>Nama</th>
+                        <th>Motor Kecil</th>
+                        <th>Motor Besar</th>
+                        <th>Komisi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('qr-video');
+        const hasilScanElement = document.getElementById('hasil-scan');
+        const errorElement = document.getElementById('error-message');
+        const pindaiQrButton = document.getElementById('pindai-qr-button');
+        const videoContainer = document.getElementById('video-container');
+        const stopScanButton = document.getElementById('stop-scan-button');
+        const dataTableBody = document.querySelector('#data-table tbody');
+        const summaryElement = document.getElementById('summary');
+        const commissionTableBody = document.querySelector('#commission-table tbody');
+
+        let scanning = false;
+        let stream = null;
+        let tanggalData = new Date().toISOString().split('T')[0]; // Tanggal data yang sedang ditampilkan
+        let konfirmasiHapus = false; // Variabel untuk memastikan konfirmasi hapus hanya muncul sekali
+        
+        // Harga dasar transaksi
+        const hargaMotor = {
+            'motor kecil': 15000,
+            'motor besar': 20000
+        };
+
+        // Komisi untuk duplikat (jika nama yang sama)
+        const komisiMotor = {
+            'motor kecil': 5000,
+            'motor besar': 7000
+        };
+
+        // Inisialisasi Supabase
+        const supabaseUrl = 'https://rwyljfdocxrscoxptlvr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3eWxqZmRvY3hyc2NveHB0bHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA0OTI5NjAsImV4cCI6MjA1NjA2ODk2MH0.X5FzdkSbJWHyDKe7fxm8G5_JinT6RIitMmeks2djVBg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        const tableName = 'nama_tabel_anda'; // Ganti dengan nama tabel Anda
+
+        pindaiQrButton.addEventListener('click', () => {
+            if (!scanning) {
+                startScan();
+            }
+        });
+
+        stopScanButton.addEventListener('click', () => {
+            stopScan();
+        });
+
+
+        function startScan() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(function(mediaStream) {
+                    scanning = true;
+                    pindaiQrButton.textContent = 'Memindai...';
+                    videoContainer.style.display = 'block';
+                    stopScanButton.style.display = 'block';
+                    stream = mediaStream;
+                    videoElement.srcObject = mediaStream;
+                    videoElement.setAttribute('playsinline', true);
+                    videoElement.play();
+                    requestAnimationFrame(scan);
+                })
+                .catch(function(err) {
+                    console.error("Error accessing the camera", err);
+                    errorElement.textContent = 'Gagal mengakses kamera: ' + err.message;
+                    errorElement.style.display = 'block';
+                });
+        }
+
+        async function scan() {
+            if (!scanning) return;
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = videoElement.videoHeight;
+                canvas.width = videoElement.videoWidth;
+                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                    let hasilScan = code.data;
+                    let dataArray = hasilScan.split(" - ");
+                    if (dataArray.length === 3) {
+                        let nama = dataArray[0];
+                        let jenisMotor = dataArray[1].toLowerCase();
+                        let harga = parseFloat(dataArray[2]); // Parse harga sebagai float
+
+                        if (isNaN(harga)) {
+                            hasilScanElement.textContent = "Format harga tidak valid. Gunakan angka.";
+                            hasilScanElement.classList.add('error');
+                            stopScan();
+                            return;
+                        }
+
+                        if (harga) { // Harga tidak null atau undefined
+                            hasilScanElement.textContent = `Nama: ${nama}, Jenis Motor: ${jenisMotor}, Harga: ${formatRupiah(harga)}`;
+                            hasilScanElement.classList.remove('error');
+                            // Simpan data ke Supabase
+                            const { error } = await supabase
+                                .from(tableName)
+                                .insert({ nama: nama, jenis_motor: jenisMotor, harga: harga });
+                            if (error) {
+                                console.error("Error inserting data to Supabase:", error);
+                                errorElement.textContent = 'Gagal menyimpan data ke database.';
+                                errorElement.style.display = 'block';
+                            } else {
+                                console.log("Data berhasil disimpan ke Supabase");
+                                loadData(tanggalData);
+                            }
+                        } else {
+                            hasilScanElement.textContent = `Nama: ${nama}, Jenis Motor: ${jenisMotor} tidak ditemukan.`;
+                            hasilScanElement.classList.add('error');
+                        }
+                    } else {
+                        hasilScanElement.textContent = "Format QR Code tidak valid. Gunakan format Nama - Jenis Motor - Harga.";
+                        hasilScanElement.classList.add('error');
+                    }
+                    stopScan();
+                    return;
+                }
+            }
+            requestAnimationFrame(scan);
+        }
+
+        function stopScan() {
+            scanning = false;
+            pindaiQrButton.textContent = 'Mulai Pindai QR';
+            videoContainer.style.display = 'none';
+            stopScanButton.style.display = 'none';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                stream = null;
+            }
+        }
+
+        function formatRupiah(angka) {
+            var reverse = angka.toString().split('').reverse().join('');
+            var ribuan = reverse.match(/\d{1,3}/g);
+            var formatted = ribuan.join('.').split('').reverse().join('');
+            return formatted;
+        }
+
+        async function loadData(tanggal) {
+            try {
+                const { data, error } = await supabase
+                    .from(tableName)
+                    .select('*')
+                    .gte('tanggal', tanggal)
+                    .lt('tanggal', tanggal + 'T23:59:59.999Z')
+                    .order('tanggal', { ascending: false }); // Order by tanggal descending
+
+                if (error) {
+                    console.error("Error fetching data from Supabase:", error);
+                    errorElement.textContent = 'Gagal mengambil data dari database: ' + error.message;
+                    errorElement.style.display = 'block';
+                    return;
+                }
+
+                // Bersihkan tabel data dan tabel rekap komisi
+                dataTableBody.innerHTML = '';
+                commissionTableBody.innerHTML = '';
+
+                let totalPemasukan = 0;
+                let countMotorKecil = 0;
+                let countMotorBesar = 0;
+
+                // Untuk perhitungan komisi per nama, group data berdasarkan nama
+                let dataGroup = {};
+
+                if (data.length === 0) {
+                    dataTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Tidak ada data hari ini.</td></tr>';
+                } else {
+                    // Tampilkan setiap transaksi ke tabel data
+                    data.forEach(item => {
+                        totalPemasukan += parseFloat(item.harga); // Tambahkan harga ke totalPemasukan
+                        if (item.jenis_motor.toLowerCase() === 'motor kecil') {
+                            countMotorKecil++;
+                        } else if (item.jenis_motor.toLowerCase() === 'motor besar') {
+                            countMotorBesar++;
+                        }
+                        const tanggalWaktu = new Date(item.tanggal).toLocaleString('id-ID', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.nama}</td>
+                            <td>${item.jenis_motor}</td>
+                            <td>Rp ${formatRupiah(item.harga)}</td>
+                            <td>${tanggalWaktu}</td>
+                            <td><button class="delete-button" data-id="${item.id}">Hapus</button></td>
+                        `;
+                        dataTableBody.insertAdjacentHTML('afterbegin', row.outerHTML); // Tambahkan ke atas tabel
+
+                        // Grouping data per nama untuk perhitungan komisi
+                        if (!dataGroup[item.nama]) {
+                            dataGroup[item.nama] = [];
+                        }
+                        dataGroup[item.nama].push(item);
+                    });
+                }
+
+                // Hitung total komisi per nama
+                let totalKomisi = 0;
+                for (const nama in dataGroup) {
+                    const transaksi = dataGroup[nama];
+                    let motorKecilCount = 0;
+                    let motorBesarCount = 0;
+                    let komisiPerNama = 0;
+                    // Iterasi melalui transaksi untuk menghitung komisi
+                    transaksi.forEach((item, idx) => {
+                        // Berikan komisi untuk setiap transaksi (termasuk yang pertama)
+                        if (item.jenis_motor.toLowerCase() === 'motor kecil') {
+                            komisiPerNama += komisiMotor['motor kecil'];
+                            motorKecilCount++;
+                        } else if (item.jenis_motor.toLowerCase() === 'motor besar') {
+                            komisiPerNama += komisiMotor['motor besar'];
+                            motorBesarCount++;
+                        }
+                    });
+                    totalKomisi += komisiPerNama;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${nama}</td>
+                        <td>${motorKecilCount}</td>
+                        <td>${motorBesarCount}</td>
+                        <td>Rp ${formatRupiah(komisiPerNama)}</td>
+                    `;
+                    commissionTableBody.appendChild(row);
+                }
+
+                // Hitung pemasukan hari ini (net revenue)
+                const pemasukanHariIni = totalPemasukan - totalKomisi;
+
+                // Update tampilan summary
+                summaryElement.innerHTML = `
+                    Total Pemasukan: Rp ${formatRupiah(totalPemasukan)} <br>
+                    Motor Kecil: ${countMotorKecil}, Motor Besar: ${countMotorBesar} <br>
+                    Komisi Total: Rp ${formatRupiah(totalKomisi)} <br>
+                    Pemasukan Hari Ini: Rp ${formatRupiah(pemasukanHariIni)}
+                `;
+
+                // Event listener untuk tombol hapus (gunakan event delegation)
+                dataTableBody.addEventListener('click', async (event) => {
+                    if (event.target.classList.contains('delete-button')) {
+                        const id = event.target.dataset.id;
+                        // Tambahkan konfirmasi di sini
+                        if (!konfirmasiHapus) {
+                            konfirmasiHapus = true; // Set ke true setelah konfirmasi pertama
+                            const konfirmasi = confirm("Apakah Anda yakin ingin menghapus data ini?");
+                            if (konfirmasi) {
+                                const { error } = await supabase
+                                    .from(tableName)
+                                    .delete()
+                                    .eq('id', id);
+                                if (error) {
+                                    console.error("Error deleting data from Supabase:", error);
+                                    errorElement.textContent = 'Gagal menghapus data dari database: ' + error.message;
+                                    errorElement.style.display = 'block';
+                                } else {
+                                    console.log("Data berhasil dihapus dari Supabase");
+                                    loadData(tanggalData); // Refresh data setelah penghapusan
+                                }
+                            }
+                        } else {
+                            const { error } = await supabase
+                                .from(tableName)
+                                .delete()
+                                .eq('id', id);
+                            if (error) {
+                                console.error("Error deleting data from Supabase:", error);
+                                errorElement.textContent = 'Gagal menghapus data dari database: ' + error.message;
+                                errorElement.style.display = 'block';
+                            } else {
+                                console.log("Data berhasil dihapus dari Supabase");
+                                loadData(tanggalData); // Refresh data setelah penghapusan
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error fetching data from Supabase:", error);
+                errorElement.textContent = 'Terjadi kesalahan: ' + error.message;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // Memuat data saat halaman pertama kali dibuka dan realtime subscription
+        window.onload = () => {
+            loadData(tanggalData);
+            supabase
+                .channel('any')
+                .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, payload => {
+                    loadData(tanggalData);
+                })
+                .subscribe()
+        };
+    </script>
+</body>
+</html>
