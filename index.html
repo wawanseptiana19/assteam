@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pembaca Kode QR dengan Harga Motor</title>
+  <title>Pembaca Kode QR dengan Harga Motor & Pengeluaran</title>
   <!-- Library untuk QR Code dan Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -46,10 +46,11 @@
       align-items: center;
       margin-top: 70px;
       width: 90%;
-      max-width: 800px;
+      max-width: 1000px;
       box-sizing: border-box;
     }
-    #pindai-qr-button, #stop-scan-button {
+    /* Tombol */
+    button, input[type="button"] {
       padding: 10px 20px;
       border: none;
       cursor: pointer;
@@ -66,6 +67,12 @@
       margin-top: 10px;
       display: none;
     }
+    .nav-tanggal {
+      margin: 10px;
+      background-color: #6c757d;
+      color: #fff;
+    }
+    /* Container video scan */
     #video-container {
       display: none;
       border: 1px solid #ccc;
@@ -79,6 +86,7 @@
       max-height: 480px;
       display: block;
     }
+    /* Pesan hasil scan dan error */
     #hasil-scan {
       font-size: 16px;
       font-weight: bold;
@@ -98,7 +106,7 @@
       width: 100%;
       text-align: center;
     }
-    /* Styling untuk tabel data */
+    /* Tabel data motor */
     #data-hari-ini {
       margin-top: 20px;
       width: 100%;
@@ -116,8 +124,7 @@
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
       margin-bottom: 15px;
     }
-    table th,
-    table td {
+    table th, table td {
       padding: 10px;
       border: 1px solid #ddd;
       text-align: left;
@@ -129,13 +136,17 @@
     table tr:hover {
       background-color: #e0f7fa;
     }
-    /* Styling untuk summary */
+    /* Section summary */
     #summary {
       font-size: 18px;
       font-weight: bold;
       color: #333;
       text-align: center;
       margin-bottom: 15px;
+    }
+    /* Tabel rekap komisi */
+    #commission-table {
+      margin-bottom: 30px;
     }
     .delete-button {
       background-color: #dc3545;
@@ -149,6 +160,34 @@
     .delete-button:hover {
       background-color: #c82333;
     }
+    /* Section Pengeluaran */
+    #pengeluaran-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 30px;
+    }
+    #pengeluaran-container h2 {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .form-pengeluaran {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+    .form-pengeluaran input {
+      padding: 8px;
+      margin: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .form-pengeluaran button {
+      background-color: #28a745;
+      color: white;
+      margin: 5px;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +196,13 @@
     <button id="pindai-qr-button">Mulai Pindai QR</button>
   </div>
   <div id="content">
+    <!-- Navigasi Tanggal: tombol "Tanggal Berikutnya" di kiri dan "Tanggal Sebelumnya" di kanan -->
+    <div id="navigasi-tanggal">
+      <button class="nav-tanggal" id="next-date">Tanggal Berikutnya</button>
+      <button class="nav-tanggal" id="prev-date">Tanggal Sebelumnya</button>
+    </div>
+
+    <!-- Video untuk pemindaian QR Code -->
     <div id="video-container">
       <video id="qr-video" autoplay></video>
     </div>
@@ -164,6 +210,7 @@
     <div id="error-message"></div>
     <button id="stop-scan-button">Stop Pemindaian</button>
     
+    <!-- Data Transaksi Motor -->
     <div id="data-hari-ini">
       <h2>Data Motor Hari Ini</h2>
       <table id="data-table">
@@ -176,17 +223,10 @@
             <th>Aksi</th>
           </tr>
         </thead>
-        <tbody>
-        </tbody>
+        <tbody></tbody>
       </table>
       
-      <div id="summary">
-        Total Pemasukan: Rp 0 <br>
-        Motor Kecil: 0, Motor Besar: 0 <br>
-        Komisi Total: Rp 0 <br>
-        Pemasukan Hari Ini: Rp 0
-      </div>
-      
+      <!-- Rekap Komisi Per Nama -->
       <h2>Rekap Komisi Per Nama</h2>
       <table id="commission-table">
         <thead>
@@ -197,14 +237,55 @@
             <th>Komisi</th>
           </tr>
         </thead>
-        <tbody>
-        </tbody>
+        <tbody></tbody>
       </table>
+    </div>
+    
+    <!-- Section Pengeluaran -->
+    <div id="pengeluaran-container">
+      <h2>Pengeluaran</h2>
+      <div class="form-pengeluaran">
+        <input type="text" id="keterangan-pengeluaran" placeholder="Keterangan Pengeluaran">
+        <input type="number" id="jumlah-pengeluaran" placeholder="Jumlah Pengeluaran">
+        <button id="tambah-pengeluaran-button">Tambah Pengeluaran</button>
+      </div>
+      <table id="pengeluaran-table">
+        <thead>
+          <tr>
+            <th>Keterangan</th>
+            <th>Jumlah</th>
+            <th>Tanggal</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    
+    <!-- Summary -->
+    <div id="summary">
+      <div id="tanggal-summary">Data Tanggal: <span id="current-date"></span></div>
+      Total Pemasukan Motor: Rp 0 <br>
+      Motor Kecil: 0, Motor Besar: 0 <br>
+      Komisi Total: Rp 0 <br>
+      Pemasukan Bersih Motor: Rp 0 <br>
+      Total Pengeluaran: Rp 0 <br>
+      Saldo: Rp 0
     </div>
   </div>
 
   <script>
-    // Inisialisasi elemen DOM
+    /***********************************
+     * Fungsi Pembantu: Dapatkan tanggal lokal dalam format YYYY-MM-DD
+     ***********************************/
+    function getLocalDate() {
+      const now = new Date();
+      // Offset dalam milidetik untuk menyesuaikan zona waktu lokal
+      const offset = now.getTimezoneOffset() * 60000;
+      return new Date(now - offset).toISOString().split('T')[0];
+    }
+
+    // Inisialisasi elemen DOM untuk QR, data motor, pengeluaran, dan navigasi tanggal
     const videoElement = document.getElementById('qr-video');
     const hasilScanElement = document.getElementById('hasil-scan');
     const errorElement = document.getElementById('error-message');
@@ -212,12 +293,31 @@
     const videoContainer = document.getElementById('video-container');
     const stopScanButton = document.getElementById('stop-scan-button');
     const dataTableBody = document.querySelector('#data-table tbody');
-    const summaryElement = document.getElementById('summary');
     const commissionTableBody = document.querySelector('#commission-table tbody');
+    const summaryElement = document.getElementById('summary');
+    const currentDateDisplay = document.getElementById('current-date');
+
+    // Elemen DOM untuk pengeluaran
+    const pengeluaranTableBody = document.querySelector('#pengeluaran-table tbody');
+    const keteranganPengeluaranInput = document.getElementById('keterangan-pengeluaran');
+    const jumlahPengeluaranInput = document.getElementById('jumlah-pengeluaran');
+    const tambahPengeluaranButton = document.getElementById('tambah-pengeluaran-button');
     
+    // Elemen navigasi tanggal
+    const prevDateButton = document.getElementById('prev-date');
+    const nextDateButton = document.getElementById('next-date');
+
+    // Variabel global untuk QR scan dan tanggal; set tanggalData dengan tanggal lokal sekarang
     let scanning = false;
     let stream = null;
-    let tanggalData = new Date().toISOString().split('T')[0]; // Tanggal saat ini
+    let tanggalData = getLocalDate();
+
+    // Variabel untuk perhitungan summary
+    let motorTotal = 0,
+        motorKomisi = 0,
+        countMotorKecil = 0,
+        countMotorBesar = 0,
+        totalPengeluaran = 0;
     
     // Harga dasar transaksi dan komisi
     const hargaMotor = {
@@ -234,21 +334,54 @@
     const supabaseUrl = 'https://rwyljfdocxrscoxptlvr.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3eWxqZmRvY3hyc2NveHB0bHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA0OTI5NjAsImV4cCI6MjA1NjA2ODk2MH0.X5FzdkSbJWHyDKe7fxm8G5_JinT6RIitMmeks2djVBg';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-    const tableName = 'nama_tabel_anda'; // Ganti dengan nama tabel Anda
+    const tableMotor = 'nama_tabel_anda';          // Tabel transaksi motor
+    const tablePengeluaran = 'pengeluaran_tabel_anda'; // Tabel pengeluaran
 
-    // Tombol mulai pindai QR
+    // Tampilkan tanggal saat ini di summary
+    function updateDisplayTanggal() {
+      currentDateDisplay.textContent = tanggalData;
+    }
+    updateDisplayTanggal();
+
+    // Event listener untuk mulai scan QR
     pindaiQrButton.addEventListener('click', () => {
-      if (!scanning) {
-        startScan();
-      }
+      if (!scanning) startScan();
     });
-
-    // Tombol stop pemindaian
+    
+    // Event listener untuk stop scan QR
     stopScanButton.addEventListener('click', () => {
       stopScan();
     });
-
-    // Fungsi untuk memulai pemindaian QR
+    
+    // Event listener untuk tambah pengeluaran
+    tambahPengeluaranButton.addEventListener('click', async () => {
+      const keterangan = keteranganPengeluaranInput.value.trim();
+      const jumlah = parseFloat(jumlahPengeluaranInput.value);
+      if (!keterangan) {
+        alert("Keterangan pengeluaran tidak boleh kosong.");
+        return;
+      }
+      if (isNaN(jumlah) || jumlah <= 0) {
+        alert("Jumlah pengeluaran harus berupa angka positif.");
+        return;
+      }
+      // Simpan data pengeluaran ke Supabase
+      const { error } = await supabase
+        .from(tablePengeluaran)
+        .insert({ keterangan: keterangan, jumlah: jumlah });
+      if (error) {
+        console.error("Error inserting pengeluaran:", error);
+        errorElement.textContent = 'Gagal menyimpan pengeluaran: ' + (error.message || error);
+        errorElement.style.display = 'block';
+      } else {
+        console.log("Data pengeluaran berhasil disimpan.");
+        keteranganPengeluaranInput.value = '';
+        jumlahPengeluaranInput.value = '';
+        loadPengeluaran();
+      }
+    });
+    
+    // Fungsi untuk memulai pemindaian QR Code
     function startScan() {
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
         .then(function(mediaStream) {
@@ -268,7 +401,7 @@
           errorElement.style.display = 'block';
         });
     }
-
+    
     // Fungsi utama scanning QR Code
     async function scan() {
       if (!scanning) return;
@@ -284,10 +417,12 @@
           let hasilScan = code.data;
           let dataArray = hasilScan.split(" - ");
           if (dataArray.length === 3) {
-            let nama = dataArray[0];
-            let jenisMotor = dataArray[1].toLowerCase();
+            let nama = dataArray[0].trim();
+            // Ubah jenis motor menjadi format: "Motor Kecil" atau "Motor Besar"
+            let jenisMotorRaw = dataArray[1].trim().toLowerCase();
+            let jenisMotor = jenisMotorRaw.replace(/\b\w/g, char => char.toUpperCase());
             let harga = parseFloat(dataArray[2]);
-
+    
             if (isNaN(harga)) {
               hasilScanElement.textContent = "Format harga tidak valid. Gunakan angka.";
               hasilScanElement.classList.add('error');
@@ -295,21 +430,20 @@
               return;
             }
             
-            // Tampilkan hasil scan di layar
             hasilScanElement.textContent = `Nama: ${nama}, Jenis Motor: ${jenisMotor}, Harga: ${formatRupiah(harga)}`;
             hasilScanElement.classList.remove('error');
-
-            // Simpan data ke Supabase
+    
+            // Simpan data transaksi motor ke Supabase
             const { error } = await supabase
-              .from(tableName)
+              .from(tableMotor)
               .insert({ nama: nama, jenis_motor: jenisMotor, harga: harga });
             if (error) {
-              console.error("Error inserting data to Supabase:", error);
-              errorElement.textContent = 'Gagal menyimpan data ke database.';
+              console.error("Error inserting data motor:", error);
+              errorElement.textContent = 'Gagal menyimpan data motor: ' + (error.message || error);
               errorElement.style.display = 'block';
             } else {
-              console.log("Data berhasil disimpan ke Supabase");
-              loadData(tanggalData);
+              console.log("Data motor berhasil disimpan.");
+              loadData();
             }
           } else {
             hasilScanElement.textContent = "Format QR Code tidak valid. Gunakan format: Nama - Jenis Motor - Harga.";
@@ -321,7 +455,7 @@
       }
       requestAnimationFrame(scan);
     }
-
+    
     // Fungsi untuk menghentikan pemindaian QR
     function stopScan() {
       scanning = false;
@@ -334,8 +468,8 @@
         stream = null;
       }
     }
-
-    // Fungsi untuk format rupiah menggunakan Intl.NumberFormat
+    
+    // Fungsi format rupiah menggunakan Intl.NumberFormat
     function formatRupiah(angka) {
       return new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -343,39 +477,42 @@
         minimumFractionDigits: 0
       }).format(angka);
     }
-
-    // Fungsi untuk memuat data dari Supabase sesuai tanggal
-    async function loadData(tanggal) {
+    
+    // Fungsi untuk memuat data transaksi motor dan perhitungan komisi
+    async function loadData() {
       try {
         const { data, error } = await supabase
-          .from(tableName)
+          .from(tableMotor)
           .select('*')
-          .gte('tanggal', tanggal)
-          .lt('tanggal', tanggal + 'T23:59:59.999Z')
+          .gte('tanggal', tanggalData)
+          .lt('tanggal', tanggalData + 'T23:59:59.999Z')
           .order('tanggal', { ascending: false });
-
+    
         if (error) {
-          console.error("Error fetching data from Supabase:", error);
-          errorElement.textContent = 'Gagal mengambil data dari database: ' + error.message;
+          console.error("Error fetching data motor:", error);
+          errorElement.textContent = 'Gagal mengambil data motor: ' + (error.message || error);
           errorElement.style.display = 'block';
           return;
         }
         
-        // Bersihkan isi tabel
+        // Reset variabel summary motor
+        motorTotal = 0;
+        motorKomisi = 0;
+        countMotorKecil = 0;
+        countMotorBesar = 0;
+    
+        // Bersihkan tabel data motor dan rekap komisi
         dataTableBody.innerHTML = '';
         commissionTableBody.innerHTML = '';
-
-        let totalPemasukan = 0;
-        let countMotorKecil = 0;
-        let countMotorBesar = 0;
+    
         let dataGroup = {};
-
+    
         if (data.length === 0) {
           dataTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Tidak ada data hari ini.</td></tr>';
         } else {
-          // Tampilkan setiap transaksi pada tabel
+          // Tampilkan setiap transaksi motor pada tabel
           data.forEach(item => {
-            totalPemasukan += parseFloat(item.harga);
+            motorTotal += parseFloat(item.harga);
             if (item.jenis_motor.toLowerCase() === 'motor kecil') {
               countMotorKecil++;
             } else if (item.jenis_motor.toLowerCase() === 'motor besar') {
@@ -389,17 +526,16 @@
               minute: '2-digit',
               second: '2-digit'
             });
-
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${item.nama}</td>
               <td>${item.jenis_motor}</td>
               <td>${formatRupiah(item.harga)}</td>
               <td>${tanggalWaktu}</td>
-              <td><button class="delete-button" data-id="${item.id}">Hapus</button></td>
+              <td><button class="delete-button" data-id="${item.id}" data-type="motor">Hapus</button></td>
             `;
             dataTableBody.insertAdjacentElement('afterbegin', row);
-
+    
             // Grouping data untuk perhitungan komisi per nama
             if (!dataGroup[item.nama]) {
               dataGroup[item.nama] = [];
@@ -407,9 +543,8 @@
             dataGroup[item.nama].push(item);
           });
         }
-
-        // Hitung dan tampilkan rekap komisi per nama
-        let totalKomisi = 0;
+    
+        // Hitung rekap komisi per nama
         for (const nama in dataGroup) {
           const transaksi = dataGroup[nama];
           let motorKecilCount = 0;
@@ -424,7 +559,7 @@
               motorBesarCount++;
             }
           });
-          totalKomisi += komisiPerNama;
+          motorKomisi += komisiPerNama;
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${nama}</td>
@@ -434,52 +569,149 @@
           `;
           commissionTableBody.appendChild(row);
         }
-
-        // Hitung pemasukan bersih hari ini
-        const pemasukanHariIni = totalPemasukan - totalKomisi;
-        summaryElement.innerHTML = `
-          Total Pemasukan: ${formatRupiah(totalPemasukan)} <br>
-          Motor Kecil: ${countMotorKecil}, Motor Besar: ${countMotorBesar} <br>
-          Komisi Total: ${formatRupiah(totalKomisi)} <br>
-          Pemasukan Hari Ini: ${formatRupiah(pemasukanHariIni)}
-        `;
-
+    
+        updateSummary();
+        
       } catch (error) {
-        console.error("Error fetching data from Supabase:", error);
-        errorElement.textContent = 'Terjadi kesalahan: ' + error.message;
+        console.error("Error fetching data motor:", error);
+        errorElement.textContent = 'Terjadi kesalahan: ' + (error.message || error);
         errorElement.style.display = 'block';
       }
     }
-
-    // Event delegation untuk tombol hapus (dipasang satu kali)
-    dataTableBody.addEventListener('click', async (event) => {
+    
+    // Fungsi untuk memuat data pengeluaran
+    async function loadPengeluaran() {
+      try {
+        const { data, error } = await supabase
+          .from(tablePengeluaran)
+          .select('*')
+          .gte('tanggal', tanggalData)
+          .lt('tanggal', tanggalData + 'T23:59:59.999Z')
+          .order('tanggal', { ascending: false });
+    
+        if (error) {
+          console.error("Error fetching pengeluaran:", error);
+          errorElement.textContent = 'Gagal mengambil data pengeluaran: ' + (error.message || error);
+          errorElement.style.display = 'block';
+          return;
+        }
+    
+        totalPengeluaran = 0;
+        pengeluaranTableBody.innerHTML = '';
+    
+        if (data.length === 0) {
+          pengeluaranTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada data pengeluaran hari ini.</td></tr>';
+        } else {
+          data.forEach(item => {
+            totalPengeluaran += parseFloat(item.jumlah);
+            const tanggalWaktu = new Date(item.tanggal).toLocaleString('id-ID', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${item.keterangan}</td>
+              <td>${formatRupiah(item.jumlah)}</td>
+              <td>${tanggalWaktu}</td>
+              <td><button class="delete-button" data-id="${item.id}" data-type="pengeluaran">Hapus</button></td>
+            `;
+            pengeluaranTableBody.insertAdjacentElement('afterbegin', row);
+          });
+        }
+    
+        updateSummary();
+    
+      } catch (error) {
+        console.error("Error fetching pengeluaran:", error);
+        errorElement.textContent = 'Terjadi kesalahan: ' + (error.message || error);
+        errorElement.style.display = 'block';
+      }
+    }
+    
+    // Fungsi untuk mengupdate tampilan summary
+    function updateSummary() {
+      const pemasukanBersih = motorTotal - motorKomisi;
+      const saldo = pemasukanBersih - totalPengeluaran;
+      summaryElement.innerHTML = `
+        <div id="tanggal-summary">Data Tanggal: <span id="current-date">${tanggalData}</span></div>
+        Total Pemasukan Motor: ${formatRupiah(motorTotal)} <br>
+        Motor Kecil: ${countMotorKecil}, Motor Besar: ${countMotorBesar} <br>
+        Komisi Total: ${formatRupiah(motorKomisi)} <br>
+        Pemasukan Bersih Motor: ${formatRupiah(pemasukanBersih)} <br>
+        Total Pengeluaran: ${formatRupiah(totalPengeluaran)} <br>
+        Saldo: ${formatRupiah(saldo)}
+      `;
+    }
+    
+    // Event delegation untuk tombol hapus (motor dan pengeluaran)
+    document.addEventListener('click', async (event) => {
       if (event.target.classList.contains('delete-button')) {
         const id = event.target.dataset.id;
+        const type = event.target.dataset.type; // "motor" atau "pengeluaran"
         const konfirmasi = confirm("Apakah Anda yakin ingin menghapus data ini?");
         if (konfirmasi) {
+          let tableNameToDelete = (type === "motor") ? tableMotor : tablePengeluaran;
           const { error } = await supabase
-            .from(tableName)
+            .from(tableNameToDelete)
             .delete()
             .eq('id', id);
           if (error) {
-            console.error("Error deleting data from Supabase:", error);
-            errorElement.textContent = 'Gagal menghapus data dari database: ' + error.message;
+            console.error("Error deleting data:", error);
+            errorElement.textContent = 'Gagal menghapus data: ' + (error.message || error);
             errorElement.style.display = 'block';
           } else {
-            console.log("Data berhasil dihapus dari Supabase");
-            loadData(tanggalData);
+            console.log("Data berhasil dihapus.");
+            if (type === "motor") {
+              loadData();
+            } else {
+              loadPengeluaran();
+            }
           }
         }
       }
     });
+    
+    // Fungsi untuk mengubah tanggalData berdasarkan offset (dalam hari)
+    function changeTanggalData(offset) {
+      const currentDate = new Date(tanggalData);
+      currentDate.setDate(currentDate.getDate() + offset);
+      // Gunakan fungsi getLocalDate() agar mendapatkan format tanggal lokal yang benar
+      tanggalData = currentDate.toISOString().split('T')[0];
+      updateDisplayTanggal();
+      loadData();
+      loadPengeluaran();
+    }
 
-    // Inisialisasi data pada saat load halaman dan setup realtime subscription
+    // Event listener untuk navigasi tanggal
+    nextDateButton.addEventListener('click', () => {
+      changeTanggalData(1);
+    });
+    prevDateButton.addEventListener('click', () => {
+      changeTanggalData(-1);
+    });
+    
+    // Saat halaman pertama kali dibuka, set tanggalData ke tanggal lokal sekarang
     window.onload = () => {
-      loadData(tanggalData);
+      tanggalData = getLocalDate();
+      updateDisplayTanggal();
+      loadData();
+      loadPengeluaran();
+    
       supabase
-        .channel('any')
-        .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, payload => {
-          loadData(tanggalData);
+        .channel('motor-channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: tableMotor }, payload => {
+          loadData();
+        })
+        .subscribe();
+    
+      supabase
+        .channel('pengeluaran-channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: tablePengeluaran }, payload => {
+          loadPengeluaran();
         })
         .subscribe();
     };
