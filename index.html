@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pembaca Kode QR dengan Harga Motor & Pengeluaran</title>
-  <!-- Library untuk QR Code dan Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -148,6 +147,9 @@
     #commission-table {
       margin-bottom: 30px;
     }
+    #commission-table tfoot {
+      font-weight: bold;
+    }
     .delete-button {
       background-color: #dc3545;
       color: white;
@@ -196,13 +198,12 @@
     <button id="pindai-qr-button">Mulai Pindai QR</button>
   </div>
   <div id="content">
-    <!-- Navigasi Tanggal: tombol "Tanggal Berikutnya" di kiri dan "Tanggal Sebelumnya" di kanan -->
     <div id="navigasi-tanggal">
       <button class="nav-tanggal" id="next-date">Tanggal Berikutnya</button>
+      <span id="current-date"></span>
       <button class="nav-tanggal" id="prev-date">Tanggal Sebelumnya</button>
     </div>
 
-    <!-- Video untuk pemindaian QR Code -->
     <div id="video-container">
       <video id="qr-video" autoplay></video>
     </div>
@@ -210,7 +211,6 @@
     <div id="error-message"></div>
     <button id="stop-scan-button">Stop Pemindaian</button>
     
-    <!-- Data Transaksi Motor -->
     <div id="data-hari-ini">
       <h2>Data Motor Hari Ini</h2>
       <table id="data-table">
@@ -224,9 +224,15 @@
           </tr>
         </thead>
         <tbody></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align: right; font-weight: bold;">Total Pemasukan Motor:</td>
+            <td id="total-pemasukan-motor">Rp 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
       
-      <!-- Rekap Komisi Per Nama -->
       <h2>Rekap Komisi Per Nama</h2>
       <table id="commission-table">
         <thead>
@@ -237,18 +243,28 @@
             <th>Komisi</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          <tr>
+            <td colspan="4" style="text-align: right; font-weight: bold;">Total</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="text-align: right;">Total Motor:</td>
+            <td id="total-motor-display">0</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="2" style="text-align: right;">Komisi Total:</td>
+            <td id="total-komisi-display">Rp 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
     
-    <!-- Section Pengeluaran -->
     <div id="pengeluaran-container">
       <h2>Pengeluaran</h2>
-      <div class="form-pengeluaran">
-        <input type="text" id="keterangan-pengeluaran" placeholder="Keterangan Pengeluaran">
-        <input type="number" id="jumlah-pengeluaran" placeholder="Jumlah Pengeluaran">
-        <button id="tambah-pengeluaran-button">Tambah Pengeluaran</button>
-      </div>
       <table id="pengeluaran-table">
         <thead>
           <tr>
@@ -259,17 +275,24 @@
           </tr>
         </thead>
         <tbody></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="text-align: right; font-weight: bold;">Total Pengeluaran:</td>
+            <td id="total-pengeluaran-display">Rp 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
+      <div class="form-pengeluaran">
+        <input type="text" id="keterangan-pengeluaran" placeholder="Keterangan Pengeluaran">
+        <input type="number" id="jumlah-pengeluaran" placeholder="Jumlah Pengeluaran">
+        <button id="tambah-pengeluaran-button">Tambah Pengeluaran</button>
+      </div>
     </div>
     
-    <!-- Summary -->
     <div id="summary">
       <div id="tanggal-summary">Data Tanggal: <span id="current-date"></span></div>
-      Total Pemasukan Motor: Rp 0 <br>
-      Motor Kecil: 0, Motor Besar: 0 <br>
-      Komisi Total: Rp 0 <br>
       Pemasukan Bersih Motor: Rp 0 <br>
-      Total Pengeluaran: Rp 0 <br>
       Saldo: Rp 0
     </div>
   </div>
@@ -277,12 +300,12 @@
   <script>
     /***********************************
      * Fungsi Pembantu: Dapatkan tanggal lokal dalam format YYYY-MM-DD
+     * Zona Waktu Indonesia Barat (WIB) adalah UTC+7.
      ***********************************/
-    function getLocalDate() {
-      const now = new Date();
-      // Offset dalam milidetik untuk menyesuaikan zona waktu lokal
-      const offset = now.getTimezoneOffset() * 60000;
-      return new Date(now - offset).toISOString().split('T')[0];
+    function getLocalDate(date = new Date()) {
+      const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000); // Konversi ke UTC
+      const wibDate = new Date(utcDate.getTime() + 7 * 3600000); // Tambah 7 jam untuk WIB
+      return wibDate.toISOString().split('T')[0];
     }
 
     // Inisialisasi elemen DOM untuk QR, data motor, pengeluaran, dan navigasi tanggal
@@ -302,10 +325,15 @@
     const keteranganPengeluaranInput = document.getElementById('keterangan-pengeluaran');
     const jumlahPengeluaranInput = document.getElementById('jumlah-pengeluaran');
     const tambahPengeluaranButton = document.getElementById('tambah-pengeluaran-button');
-    
+    const totalPengeluaranDisplay = document.getElementById('total-pengeluaran-display');
+
+
     // Elemen navigasi tanggal
     const prevDateButton = document.getElementById('prev-date');
     const nextDateButton = document.getElementById('next-date');
+    const totalMotorDisplay = document.getElementById('total-motor-display');
+    const totalKomisiDisplay = document.getElementById('total-komisi-display');
+    const totalPemasukanMotorDisplay = document.getElementById('total-pemasukan-motor');
 
     // Variabel global untuk QR scan dan tanggal; set tanggalData dengan tanggal lokal sekarang
     let scanning = false;
@@ -337,7 +365,7 @@
     const tableMotor = 'nama_tabel_anda';          // Tabel transaksi motor
     const tablePengeluaran = 'pengeluaran_tabel_anda'; // Tabel pengeluaran
 
-    // Tampilkan tanggal saat ini di summary
+    // Tampilkan tanggal saat ini di navigasi tanggal
     function updateDisplayTanggal() {
       currentDateDisplay.textContent = tanggalData;
     }
@@ -368,7 +396,7 @@
       // Simpan data pengeluaran ke Supabase
       const { error } = await supabase
         .from(tablePengeluaran)
-        .insert({ keterangan: keterangan, jumlah: jumlah });
+        .insert({ keterangan: keterangan, jumlah: jumlah, tanggal: tanggalData }); // Tambahkan tanggal
       if (error) {
         console.error("Error inserting pengeluaran:", error);
         errorElement.textContent = 'Gagal menyimpan pengeluaran: ' + (error.message || error);
@@ -436,7 +464,7 @@
             // Simpan data transaksi motor ke Supabase
             const { error } = await supabase
               .from(tableMotor)
-              .insert({ nama: nama, jenis_motor: jenisMotor, harga: harga });
+              .insert({ nama: nama, jenis_motor: jenisMotor, harga: harga, tanggal: tanggalData }); // Tambahkan tanggal
             if (error) {
               console.error("Error inserting data motor:", error);
               errorElement.textContent = 'Gagal menyimpan data motor: ' + (error.message || error);
@@ -484,8 +512,7 @@
         const { data, error } = await supabase
           .from(tableMotor)
           .select('*')
-          .gte('tanggal', tanggalData)
-          .lt('tanggal', tanggalData + 'T23:59:59.999Z')
+          .eq('tanggal', tanggalData) // Gunakan tanggal yang difilter
           .order('tanggal', { ascending: false });
     
         if (error) {
@@ -504,7 +531,6 @@
         // Bersihkan tabel data motor dan rekap komisi
         dataTableBody.innerHTML = '';
         commissionTableBody.innerHTML = '';
-    
         let dataGroup = {};
     
         if (data.length === 0) {
@@ -518,13 +544,10 @@
             } else if (item.jenis_motor.toLowerCase() === 'motor besar') {
               countMotorBesar++;
             }
-            const tanggalWaktu = new Date(item.tanggal).toLocaleString('id-ID', {
+            const tanggalWaktu = new Date(item.tanggal).toLocaleDateString('id-ID', {
               day: 'numeric',
               month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
+              year: 'numeric'
             });
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -543,8 +566,12 @@
             dataGroup[item.nama].push(item);
           });
         }
+        totalPemasukanMotorDisplay.textContent = formatRupiah(motorTotal);
     
         // Hitung rekap komisi per nama
+        let totalMotorKecil = 0;
+        let totalMotorBesar = 0;
+        let grandTotalKomisi = 0;
         for (const nama in dataGroup) {
           const transaksi = dataGroup[nama];
           let motorKecilCount = 0;
@@ -554,12 +581,14 @@
             if (item.jenis_motor.toLowerCase() === 'motor kecil') {
               komisiPerNama += komisiMotor['motor kecil'];
               motorKecilCount++;
+              totalMotorKecil++;
             } else if (item.jenis_motor.toLowerCase() === 'motor besar') {
               komisiPerNama += komisiMotor['motor besar'];
               motorBesarCount++;
+              totalMotorBesar++;
             }
           });
-          motorKomisi += komisiPerNama;
+          grandTotalKomisi += komisiPerNama;
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${nama}</td>
@@ -569,12 +598,14 @@
           `;
           commissionTableBody.appendChild(row);
         }
-    
+        totalMotorDisplay.textContent = `${totalMotorKecil} Kecil, ${totalMotorBesar} Besar`;
+        totalKomisiDisplay.textContent = formatRupiah(grandTotalKomisi);
+        motorKomisi = grandTotalKomisi;
         updateSummary();
         
       } catch (error) {
         console.error("Error fetching data motor:", error);
-        errorElement.textContent = 'Terjadi kesalahan: ' + (error.message || error);
+        errorElement.textContent = 'Gagal mengambil data motor: ' + (error.message || error);
         errorElement.style.display = 'block';
       }
     }
@@ -585,8 +616,7 @@
         const { data, error } = await supabase
           .from(tablePengeluaran)
           .select('*')
-          .gte('tanggal', tanggalData)
-          .lt('tanggal', tanggalData + 'T23:59:59.999Z')
+          .eq('tanggal', tanggalData) // Filter pengeluaran berdasarkan tanggal
           .order('tanggal', { ascending: false });
     
         if (error) {
@@ -604,13 +634,10 @@
         } else {
           data.forEach(item => {
             totalPengeluaran += parseFloat(item.jumlah);
-            const tanggalWaktu = new Date(item.tanggal).toLocaleString('id-ID', {
-              day: 'numeric',
+            const tanggalWaktu = new Date(item.tanggal).toLocaleDateString('id-ID', {
+              day:'numeric',
               month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
+              year: 'numeric'
             });
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -622,7 +649,7 @@
             pengeluaranTableBody.insertAdjacentElement('afterbegin', row);
           });
         }
-    
+        totalPengeluaranDisplay.textContent = formatRupiah(totalPengeluaran);
         updateSummary();
     
       } catch (error) {
@@ -638,16 +665,12 @@
       const saldo = pemasukanBersih - totalPengeluaran;
       summaryElement.innerHTML = `
         <div id="tanggal-summary">Data Tanggal: <span id="current-date">${tanggalData}</span></div>
-        Total Pemasukan Motor: ${formatRupiah(motorTotal)} <br>
-        Motor Kecil: ${countMotorKecil}, Motor Besar: ${countMotorBesar} <br>
-        Komisi Total: ${formatRupiah(motorKomisi)} <br>
         Pemasukan Bersih Motor: ${formatRupiah(pemasukanBersih)} <br>
-        Total Pengeluaran: ${formatRupiah(totalPengeluaran)} <br>
         Saldo: ${formatRupiah(saldo)}
       `;
     }
     
-    // Event delegation untuk tombol hapus (motor dan pengeluaran)
+    // Event delegation untuk tombol hapus (motordan pengeluaran)
     document.addEventListener('click', async (event) => {
       if (event.target.classList.contains('delete-button')) {
         const id = event.target.dataset.id;
@@ -680,7 +703,7 @@
       const currentDate = new Date(tanggalData);
       currentDate.setDate(currentDate.getDate() + offset);
       // Gunakan fungsi getLocalDate() agar mendapatkan format tanggal lokal yang benar
-      tanggalData = currentDate.toISOString().split('T')[0];
+      tanggalData = getLocalDate(currentDate);
       updateDisplayTanggal();
       loadData();
       loadPengeluaran();
