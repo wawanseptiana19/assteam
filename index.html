@@ -345,7 +345,8 @@
         motorKomisi = 0,
         countMotorKecil = 0,
         countMotorBesar = 0,
-        totalPengeluaran = 0;
+        totalPengeluaran = 0,
+        saldo = 0; // Tambahkan variabel saldo
     
     // Harga dasar transaksi dan komisi
     const hargaMotor = {
@@ -364,6 +365,7 @@
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
     const tableMotor = 'nama_tabel_anda';          // Tabel transaksi motor
     const tablePengeluaran = 'pengeluaran_tabel_anda'; // Tabel pengeluaran
+    const tableSaldo = 'saldo_tabel_anda';       // Tabel saldo
 
     // Tampilkan tanggal saat ini di navigasi tanggal
     function updateDisplayTanggal() {
@@ -601,7 +603,7 @@
         totalMotorDisplay.textContent = `${totalMotorKecil} Kecil, ${totalMotorBesar} Besar`;
         totalKomisiDisplay.textContent = formatRupiah(grandTotalKomisi);
         motorKomisi = grandTotalKomisi;
-        updateSummary();
+        await updateSaldo(); // Update saldo setelah memuat data
         
       } catch (error) {
         console.error("Error fetching data motor:", error);
@@ -650,7 +652,7 @@
           });
         }
         totalPengeluaranDisplay.textContent = formatRupiah(totalPengeluaran);
-        updateSummary();
+        await updateSaldo(); // Update saldo setelah memuat pengeluaran
     
       } catch (error) {
         console.error("Error fetching pengeluaran:", error);
@@ -659,10 +661,58 @@
       }
     }
     
-    // Fungsi untuk mengupdate tampilan summary
-    function updateSummary() {
+    // Fungsi untuk mengupdate dan menyimpan saldo
+    async function updateSaldo() {
       const pemasukanBersih = motorTotal - motorKomisi;
-      const saldo = pemasukanBersih - totalPengeluaran;
+      saldo = pemasukanBersih - totalPengeluaran;
+    
+      // Coba ambil saldo dari database
+      const { data: saldoData, error: saldoError } = await supabase
+        .from(tableSaldo)
+        .select('jumlah')
+        .eq('tanggal', tanggalData);
+    
+      if (saldoError) {
+        console.error("Error fetching saldo:", saldoError);
+        errorElement.textContent = 'Gagal mengambil data saldo: ' + (saldoError.message || saldoError);
+        errorElement.style.display = 'block';
+        return;
+      }
+    
+      if (saldoData && saldoData.length > 0) {
+        // Jika ada data saldo untuk tanggal ini, update
+        const { error: updateError } = await supabase
+          .from(tableSaldo)
+          .update({ jumlah: saldo })
+          .eq('tanggal', tanggalData);
+    
+        if (updateError) {
+          console.error("Error updating saldo:", updateError);
+          errorElement.textContent = 'Gagal memperbarui data saldo: ' + (updateError.message || updateError);
+          errorElement.style.display = 'block';
+        } else {
+          console.log("Saldo berhasil diperbarui di database.");
+        }
+      } else {
+        // Jika tidak ada data saldo untuk tanggal ini, insert baru
+        const { error: insertError } = await supabase
+          .from(tableSaldo)
+          .insert({ tanggal: tanggalData, jumlah: saldo });
+    
+        if (insertError) {
+          console.error("Error inserting saldo:", insertError);
+          errorElement.textContent = 'Gagal menyimpan data saldo: ' + (insertError.message || insertError);
+          errorElement.style.display = 'block';
+        } else {
+          console.log("Saldo berhasil disimpan ke database.");
+        }
+      }
+      updateSummaryDisplay(); // Panggil fungsi untuk update tampilan saldo
+    }
+
+    // Fungsi untuk update tampilan summary
+    function updateSummaryDisplay() {
+      const pemasukanBersih = motorTotal - motorKomisi;
       summaryElement.innerHTML = `
         <div id="tanggal-summary">Data Tanggal: <span id="current-date">${tanggalData}</span></div>
         Pemasukan Bersih Motor: ${formatRupiah(pemasukanBersih)} <br>
