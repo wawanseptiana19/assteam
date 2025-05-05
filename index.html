@@ -303,7 +303,7 @@
     
     <div id="summary">
       <div id="tanggal-summary">Data Tanggal: <span id="current-date"></span></div>
-      Pemasukan Bersih Motor: Rp 0 <br>
+      Pendapatan Kotor Motor: Rp 0 <br>
       Saldo: Rp 0
     </div>
   </div>
@@ -703,8 +703,8 @@
     
     // Fungsi untuk mengupdate dan menyimpan saldo
     async function updateSaldo() {
-      const pemasukanBersih = motorTotal - motorKomisi;
-      saldo = pemasukanBersih - totalPengeluaran;
+      const pendapatanKotor = motorTotal - totalPengeluaran; // Hitung pendapatan kotor
+      saldo = pendapatanKotor - motorKomisi;
     
       // Coba ambil saldo dari database
       const { data: saldoData, error: saldoError } = await supabase
@@ -752,11 +752,11 @@
 
     // Fungsi untuk update tampilan summary
     function updateSummaryDisplay() {
-      const pemasukanBersih = motorTotal - motorKomisi;
+      const pendapatanKotor = motorTotal - totalPengeluaran;
       summaryElement.innerHTML = `
         <div id="tanggal-summary">Data Tanggal: <span id="current-date">${tanggalData}</span></div>
-        Pemasukan Bersih Motor: ${formatRupiah(pemasukanBersih)} <br>
-        Saldo: ${formatRupiah(saldo)}
+        Pendapatan Kotor : ${formatRupiah(pendapatanKotor)} <br>
+        Pendapatan Bersih: ${formatRupiah(saldo)}
       `;
     }
     
@@ -786,6 +786,7 @@
           }
         }
       }
+    
     });
     
     // Fungsi untuk mengubah tanggalData berdasarkan offset (dalam hari)
